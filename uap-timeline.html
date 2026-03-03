@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UAP Timeline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #fff;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #1a1a2e;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      background: #fff;
+      border-bottom: 2px solid #e8eaf0;
+      padding: 14px 20px 10px;
+    }
+    #header h1 {
+      font-size: 13px; font-weight: 800;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: #1a1a2e; margin-bottom: 4px;
+    }
+    #header h1 span { color:#6c757d; font-weight:400; margin-left:8px; font-size:11px; }
+
+    /* ── COLUMN LABELS ── */
+    #col-labels {
+      display: grid;
+      grid-template-columns: 1fr 14px 1fr;
+      max-width: 860px; margin: 6px auto 0;
+      padding: 0 20px;
+      font-size: 9.5px; font-weight: 800;
+      letter-spacing: .1em; text-transform: uppercase;
+    }
+    #col-labels .lbl-l { text-align:right; padding-right:18px; color:#8e44ad; }
+    #col-labels .lbl-r { padding-left:18px; color:#aab0c0; }
+
+    /* ── FILTROS ── */
+    #filters { display:flex; gap:6px; flex-wrap:wrap; padding:10px 20px 12px; }
+    .filter-btn {
+      padding: 3px 11px; border-radius:20px;
+      border:1.5px solid; font-size:11px; font-weight:600;
+      cursor:pointer; background:transparent;
+      letter-spacing:.04em; transition:all .18s;
+    }
+    .filter-btn[data-group="all"]          { border-color:#aab0c0; color:#6c757d; }
+    .filter-btn[data-group="all"].active   { background:#6c757d; color:#fff; border-color:#6c757d; }
+    .filter-btn[data-group="0"]            { border-color:#e74c3c; color:#e74c3c; }
+    .filter-btn[data-group="0"].active     { background:#e74c3c; color:#fff; }
+    .filter-btn[data-group="1"]            { border-color:#27ae60; color:#27ae60; }
+    .filter-btn[data-group="1"].active     { background:#27ae60; color:#fff; }
+    .filter-btn[data-group="2"]            { border-color:#e67e22; color:#e67e22; }
+    .filter-btn[data-group="2"].active     { background:#e67e22; color:#fff; }
+    .filter-btn[data-group="3"]            { border-color:#2980b9; color:#2980b9; }
+    .filter-btn[data-group="3"].active     { background:#2980b9; color:#fff; }
+    .filter-btn[data-group="4h"]           { border-color:#8e44ad; color:#8e44ad; }
+    .filter-btn[data-group="4h"].active    { background:#8e44ad; color:#fff; }
+    .filter-btn[data-group="4l"]           { border-color:#b07fd4; color:#b07fd4; }
+    .filter-btn[data-group="4l"].active    { background:#b07fd4; color:#fff; }
+
+    /* ── GRID ── */
+    #timeline {
+      padding: 12px 20px 60px;
+      max-width: 860px; margin:0 auto;
+      position: relative;
+    }
+    #timeline::before {
+      content:'';
+      position:absolute;
+      left: calc(50% - 1px);
+      top:0; bottom:0; width:2px;
+      background: linear-gradient(to bottom,
+        transparent, #e0e4ec 20px,
+        #e0e4ec calc(100% - 36px), transparent);
+      pointer-events:none;
+    }
+
+    .tl-row {
+      display: grid;
+      grid-template-columns: 1fr 14px 1fr;
+      align-items: start;
+    }
+    .tl-row.hidden { display:none !important; }
+
+    .ev-left   { min-width:0; padding-right:14px; }
+    .ev-center { display:flex; justify-content:center; }
+    .ev-right  { min-width:0; padding-left:14px; }
+
+    /* ── YEAR MARKER ── */
+    .year-marker { align-items:center; margin:22px 0 3px; }
+    .year-marker .ev-left { text-align:right; }
+    .year-label { font-size:11px; font-weight:800; letter-spacing:.08em; color:#bec5cf; }
+    .year-dot {
+      width:8px; height:8px; border-radius:50%;
+      background:#dde1ea; border:2px solid #fff;
+      box-shadow:0 0 0 2px #dde1ea;
+    }
+    .year-line { height:1px; background:#f0f1f5; flex:1; }
+
+    /* ── EVENTO ── */
+    .event { padding:3px 0; }
+
+    .event-dot {
+      width:14px; height:14px; border-radius:50%;
+      border:3px solid #fff;
+      position:relative; z-index:1;
+      margin-top:10px; cursor:pointer;
+      transition:transform .15s; flex-shrink:0;
+    }
+    .event-dot:hover { transform:scale(1.3); }
+
+    /* dot de ley: cuadrado redondeado */
+    .event-dot.dot-law {
+      border-radius:3px;
+    }
+
+    .date-left  { text-align:right; padding-top:9px; }
+    .date-right { text-align:left;  padding-top:9px; }
+    .ev-day   { font-size:11px; font-weight:700; color:#aab0c0; line-height:1.2; }
+    .ev-month { font-size:10px; color:#c8cdd5; }
+
+    /* ── CARDS ── */
+    .event-card {
+      background:#f9fafb;
+      border:1.5px solid #e8eaf0;
+      border-left-width:4px;
+      border-radius:8px;
+      padding:8px 12px;
+      cursor:pointer;
+      transition:box-shadow .18s, background .18s;
+    }
+    /* Congress cards: borde derecho */
+    .card-congress {
+      border-left-width:1.5px;
+      border-right-width:4px;
+      text-align:right;
+    }
+    /* Law cards: fondo ligeramente diferente */
+    .card-law {
+      background:#faf8fd;
+      border-style: dashed;
+      border-right-style: solid;
+    }
+    .event-card:hover { background:#fff; box-shadow:0 3px 14px rgba(0,0,0,.08); }
+    .event-card.open  { background:#fff; box-shadow:0 4px 18px rgba(0,0,0,.1); }
+
+    .card-cat {
+      font-size:9px; font-weight:800;
+      letter-spacing:.1em; text-transform:uppercase; margin-bottom:2px;
+    }
+    .card-title {
+      font-size:12.5px; font-weight:700;
+      color:#1a1a2e; line-height:1.3;
+    }
+    .toggle-icon {
+      font-size:11px; color:#bec5cf;
+      transition:transform .25s; display:inline-block;
+      vertical-align:middle; margin-left:4px;
+    }
+    .card-congress .toggle-icon { margin-left:0; margin-right:4px; }
+    .event-card.open .toggle-icon { transform:rotate(180deg); }
+
+    .card-detail {
+      overflow:hidden; max-height:0;
+      transition:max-height .32s ease, opacity .28s ease, margin-top .28s;
+      opacity:0; margin-top:0;
+    }
+    .card-detail.open { max-height:600px; opacity:1; margin-top:9px; }
+
+    .card-body { font-size:11.5px; color:#4a5568; line-height:1.65; margin-bottom:8px; }
+    .card-actors { display:flex; flex-wrap:wrap; gap:4px; }
+    .card-congress .card-actors { justify-content:flex-end; }
+    .actor-tag {
+      font-size:10px; font-weight:600;
+      padding:2px 7px; border-radius:12px;
+      background:#f0f1f5; color:#6c757d;
+    }
+
+    /* ── COLORES ── */
+    .cat-0{color:#e74c3c;} .dot-0{background:#e74c3c;box-shadow:0 0 0 1.5px #e74c3c;}
+    .border-0{border-left-color:#e74c3c;}
+    .cat-1{color:#27ae60;} .dot-1{background:#27ae60;box-shadow:0 0 0 1.5px #27ae60;}
+    .border-1{border-left-color:#27ae60;}
+    .cat-2{color:#e67e22;} .dot-2{background:#e67e22;box-shadow:0 0 0 1.5px #e67e22;}
+    .border-2{border-left-color:#e67e22;}
+    .cat-3{color:#2980b9;} .dot-3{background:#2980b9;box-shadow:0 0 0 1.5px #2980b9;}
+    .border-3{border-left-color:#2980b9;}
+    /* Audiencia */
+    .cat-4h{color:#8e44ad;} .dot-4h{background:#8e44ad;box-shadow:0 0 0 1.5px #8e44ad;}
+    .border-r-4h{border-right-color:#8e44ad;}
+    /* Legislación */
+    .cat-4l{color:#b07fd4;} .dot-4l{background:#b07fd4;box-shadow:0 0 0 1.5px #b07fd4;}
+    .border-r-4l{border-right-color:#b07fd4;}
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>UAP — Timeline <span>2004 – 2025</span></h1>
+  <div id="col-labels">
+    <div class="lbl-l">◀ Congreso (audiencias · legislación)</div>
+    <div></div>
+    <div class="lbl-r">Eventos ▶</div>
+  </div>
+  <div id="filters">
+    <button class="filter-btn active" data-group="all">Todos</button>
+    <button class="filter-btn" data-group="0">Incidentes</button>
+    <button class="filter-btn" data-group="1">Programas</button>
+    <button class="filter-btn" data-group="2">Documentos</button>
+    <button class="filter-btn" data-group="3">Institucional</button>
+    <button class="filter-btn" data-group="4h">Audiencias</button>
+    <button class="filter-btn" data-group="4l">Legislación</button>
+  </div>
+</div>
+
+<div id="timeline"></div>
+
+<script>
+// group: 0=Incidente, 1=Programa, 2=Documento, 3=Institucional,
+//        4h=Audiencia Congreso (izquierda), 4l=Legislación Congreso (izquierda)
+const CAT = {
+  0:'Incidente', 1:'Programa', 2:'Documento', 3:'Institucional',
+  '4h':'Audiencia · Congreso', '4l':'§ Legislación · Congreso',
+};
+
+const EVENTS = [
+  // ── 2004 ──────────────────────────────────────────────────────────────────
+  { group:'1', year:2004, month:'', day:'',
+    label:'AAWSAP — Contrato inicial DIA',
+    body:'La DIA adjudica a BAASS (Bigelow Aerospace) un contrato por $10 millones para el Advanced Aerospace Weapons System Applications Program: estudiar tecnología aeroespacial avanzada de origen desconocido.',
+    actors:['DIA','BAASS','Bigelow Aerospace'] },
+  { group:'0', year:2004, month:'Nov', day:'14',
+    label:'Incidente Tic Tac · USS Nimitz',
+    body:'El Cmdr. David Fravor (VFA-41) avista un objeto de ~12 m sin propulsión visible. El USS Princeton lo rastreaba con radar APG-73. Acelera a Mach 1.1–1.2 y recorre 60 millas en menos de un minuto. No se reporta durante 5 años.',
+    actors:['David Fravor','USS Nimitz (CVN-68)','USS Princeton (CG-59)','APG-73'] },
+
+  // ── 2010 ──────────────────────────────────────────────────────────────────
+  { group:'1', year:2010, month:'', day:'',
+    label:'AAWSAP — Expansión +$12M',
+    body:'El programa recibe $12 M adicionales. BAASS produce 38 informes técnicos clasificados para la DIA sobre propulsión, física y efectos biológicos de los UAP.',
+    actors:['DIA','BAASS'] },
+
+  // ── 2012 ──────────────────────────────────────────────────────────────────
+  { group:'1', year:2012, month:'', day:'',
+    label:'AATIP — Fondos agotados',
+    body:'Los fondos del AATIP se agotan. Elizondo continúa de forma no oficial. El programa nunca se clausura formalmente.',
+    actors:['Luis Elizondo','DoD'] },
+
+  // ── 2015 ──────────────────────────────────────────────────────────────────
+  { group:'0', year:2015, month:'Ene', day:'21',
+    label:'Gimbal & GoFast · USS Roosevelt',
+    body:'Ryan Graves y su escuadrón filman dos incidentes con el pod ATFLIR. "Gimbal": objeto que rota contra el viento. "GoFast": velocidad extrema a baja altitud sin firma térmica.',
+    actors:['Ryan Graves','USS Roosevelt (CVN-71)','ATFLIR'] },
+
+  // ── 2017 ──────────────────────────────────────────────────────────────────
+  { group:'3', year:2017, month:'Oct', day:'',
+    label:'Elizondo abandona DoD · Nace TTSA',
+    body:'Elizondo dimite del DoD y aparece con Tom DeLonge en TTSA. Primera vez que un funcionario con conocimiento directo habla sobre UAP en público.',
+    actors:['Luis Elizondo','Tom DeLonge','Chris Mellon','Steve Justice','TTSA'] },
+  { group:'2', year:2017, month:'Dic', day:'16',
+    label:'NYT revela el programa AATIP',
+    body:'"Glowing Auras and Black Money" publica el video FLIR1 (Tic Tac). Coordinado con TTSA. Punto de inflexión en la cobertura pública de los UAP.',
+    actors:['NYT','TTSA','Luis Elizondo'] },
+
+  // ── 2019 ──────────────────────────────────────────────────────────────────
+  { group:'3', year:2019, month:'Abr', day:'',
+    label:'U.S. Navy establece protocolo UAP',
+    body:'La Marina crea guías de reporte interno UAP. El portavoz Gradisher confirma que los videos son auténticos. Las guías permanecen clasificadas.',
+    actors:['U.S. Navy','Joseph Gradisher'] },
+  { group:'0', year:2019, month:'Jul', day:'15',
+    label:'Incidente USS Omaha — contacto 90 min',
+    body:'El USS Omaha y ocho buques del grupo de batalla registran múltiples UAP durante ~90 minutos con radar y EO/IR. El video del CIC permanecerá clasificado hasta mayo de 2021.',
+    actors:['USS Omaha','USS Bunker Hill','USS John Finn','USS Paul Hamilton','USS Rafael Peralta','USS Russell'] },
+
+  // ── 2020 ──────────────────────────────────────────────────────────────────
+  { group:'3', year:2020, month:'Abr', day:'27',
+    label:'DoD publica oficialmente los 3 videos',
+    body:'El DoD publica FLIR1, Gimbal y GoFast reconociendo que los fenómenos permanecen "no identificados". Primera confirmación oficial de material UAP auténtico.',
+    actors:['DoD','Susan Gough'] },
+  { group:'1', year:2020, month:'Ago', day:'4',
+    label:'UAPTF — Establecimiento oficial',
+    body:'El DoD establece la UAP Task Force bajo supervisión de la U.S. Navy para detectar, analizar y catalogar UAP que puedan suponer amenaza para la seguridad nacional.',
+    actors:['DoD','U.S. Navy','UAPTF'] },
+  { group:'4l', year:2020, month:'Dic', day:'',
+    label:'IAA FY2021 — Mandato Rubio (180 días)',
+    body:'El Senador Marco Rubio, como presidente en funciones del Comité Selecto de Inteligencia del Senado, incluye en la Ley de Autorización de Inteligencia FY2021 un mandato para que la ODNI produzca un informe sobre UAP en 180 días. Resultado: informe ODNI del 25 de junio de 2021.',
+    actors:['Marco Rubio','Senate Intelligence Committee','ODNI'] },
+
+  // ── 2021 ──────────────────────────────────────────────────────────────────
+  { group:'2', year:2021, month:'May', day:'',
+    label:'Corbell filtra video CIC del USS Omaha',
+    body:'Jeremy Corbell publica el video del CIC del USS Omaha, confirmado como auténtico por el Pentágono. Objetos esféricos sobrevolando la flota. Genera nueva presión política sobre el Congreso.',
+    actors:['Jeremy Corbell','USS Omaha','DoD'] },
+  { group:'2', year:2021, month:'Jun', day:'25',
+    label:'ODNI — Evaluación preliminar UAP',
+    body:'"Preliminary Assessment: UAP": de 144 casos analizados, solo 1 explicado. Los UAP representan riesgo de seguridad aérea y posiblemente para la seguridad nacional. Resultado directo del mandato Rubio de 2020.',
+    actors:['ODNI','UAPTF'] },
+  { group:'3', year:2021, month:'Jul', day:'',
+    label:'Grusch denuncia ante DoD IG',
+    body:'David Grusch (GS-15, NGA) denuncia ante el Inspector General del DoD la existencia de programas no reportados de recuperación de material no humano. El IG la califica de "creíble y urgente".',
+    actors:['David Grusch','NGA','UAPTF','DoD IG'] },
+  { group:'4l', year:2021, month:'Ago', day:'',
+    label:'IAA FY2022 — Sección 345 (16–0 en comité)',
+    body:'La Sección 345 de la IAA FY2022, aprobada por el Comité de Inteligencia del Senado con 16 votos a favor y 0 en contra, requiere que la UAPTF reciba datos de toda la comunidad de inteligencia y del DoD. Incluye al National Air and Space Intelligence Center (NASIC) como receptor de datos UAP. Establece reportes trimestrales clasificados al Congreso.',
+    actors:['Senate Intelligence Committee','UAPTF','NASIC','NASIC'] },
+  { group:'4l', year:2021, month:'Dic', day:'',
+    label:'NDAA FY2022 — Enmienda Gillibrand',
+    body:'Enmienda Gillibrand (con Rubio y Gallego): establece la base normativa para la futura AARO. Mandato: acceso a datos DoD e IC sobre UAP; coordinación de reporte y respuesta; intercambio de datos entre agencias; atención a efectos en la salud de observadores. Administración conjunta: Secretario de Defensa y Director de Inteligencia Nacional.',
+    actors:['Sen. Kirsten Gillibrand','Sen. Marco Rubio','Rep. Ruben Gallego'] },
+
+  // ── 2022 ──────────────────────────────────────────────────────────────────
+  { group:'4h', year:2022, month:'May', day:'17',
+    label:'Primera audiencia pública en 50 años',
+    body:'Subcomité de Inteligencia de la Cámara. Ronald Moultrie (USD(I&S)) y el vicealmirante Scott Bray presentan 11 nuevos incidentes y los videos de los buques de 2019. Bray clasifica los objetos como "drones", posición contradicha por el UAPTF. El número total de casos supera los 400. La senadora Gillibrand expresa frustración ante la falta de financiación adecuada para AARO.',
+    actors:['Ronald Moultrie','Scott Bray','House Intelligence Subcommittee','Sen. Kirsten Gillibrand'] },
+  { group:'4l', year:2022, month:'Dic', day:'',
+    label:'NDAA FY2023 — AARO establecida en ley',
+    body:'AARO (All-domain Anomaly Resolution Office) queda formalmente establecida en ley, con cadena de mando directa al Deputy Secretary of Defense. Sección 1673: manda el Informe Histórico (HR2) y el mecanismo de reporte seguro. Establece reportes anuales no clasificados al Congreso.',
+    actors:['AARO','Deputy Secretary of Defense','Sección 1673 NDAA'] },
+
+  // ── 2023 ──────────────────────────────────────────────────────────────────
+  { group:'4h', year:2023, month:'Abr', day:'',
+    label:'Audiencia Subcomité Fuerzas Armadas — Kirkpatrick',
+    body:'Presidida por la Senadora Gillibrand. Testigo: Dr. Sean Kirkpatrick (director AARO). Gillibrand: "En 2017 aprendimos que había evidencia sólida de tecnología avanzada… Si esos objetos tuvieran la etiqueta \'Made in China\', no se dejaría piedra sin mover. A causa del estigma OVNI, la respuesta ha sido irresponsablemente anémica." Señala que el presupuesto de AARO en FY2023 y FY2024 solo alcanza para sufragar sus gastos operativos.',
+    actors:['Sen. Kirsten Gillibrand','Dr. Sean Kirkpatrick','AARO','Senate Armed Services Subcommittee'] },
+  { group:'4h', year:2023, month:'Jul', day:'26',
+    label:'Grusch, Graves y Fravor testifican bajo juramento',
+    body:'118.º Congreso, Subcomité de Seguridad Nacional. Presidido por Rep. Glenn Grothman. Grusch alega programas de recuperación de material no humano ocultos al Congreso. Fravor: "El Tic Tac era muy superior a mi F/A-18 y no operaba con ningún principio aerodinámico conocido." Graves: "Solo el 5% de los avistamientos se reporta. Los UAP constituyen potencialmente una amenaza existencial para la seguridad nacional." Ambos denuncian que el Congreso ha sido sistemáticamente bloqueado en su acceso a información clasificada.',
+    actors:['David Grusch','Ryan Graves','David Fravor','Rep. Glenn Grothman','House Oversight Committee','Marco Rubio'] },
+  { group:'4l', year:2023, month:'Dic', day:'',
+    label:'NDAA FY2024 — UAP Disclosure Act excluida',
+    body:'La "UAP Disclosure Act" propuesta por el Senador Chuck Schumer (modelo en la Ley JFK) no es incluida en la versión final del NDAA FY2024 tras la resistencia de miembros de la Cámara. Su exclusión genera considerable controversia y es vista como un bloqueo deliberado a la transparencia.',
+    actors:['Sen. Chuck Schumer','House of Representatives'] },
+
+  // ── 2024 ──────────────────────────────────────────────────────────────────
+  { group:'2', year:2024, month:'Feb', day:'',
+    label:'AARO — Informe histórico de registros',
+    body:'La AARO publica su Historical Record Report: análisis retrospectivo de programas UAP del gobierno desde los años 40. Concluye que no existe evidencia verificable de programas secretos de recuperación de materiales extraterrestres, en contradicción directa con el testimonio de Grusch ante el Congreso.',
+    actors:['AARO','DoD'] },
+  { group:'4h', year:2024, month:'Nov', day:'',
+    label:'"Exposing the Truth" — Elizondo, Gallaudet y Shellenberger',
+    body:'Segunda audiencia pública de 2024. Presidida por Rep. Nancy Mace. Testigos: Tim Gallaudet (NASA/exdirector NOAA), Luis Elizondo, Michael Gold (NASA) y Michael Shellenberger. La Marina deniega en el último momento las 78 fotografías UAP solicitadas. Shellenberger muestra documentos del UAPTF obtenidos por The Black Vault. Elizondo declara haber sido presionado para abandonar AATIP.',
+    actors:['Tim Gallaudet','Luis Elizondo','Michael Gold','Michael Shellenberger','Rep. Nancy Mace','House Oversight Committee'] },
+
+  // ── 2025 ──────────────────────────────────────────────────────────────────
+  { group:'4h', year:2025, month:'Sep', day:'9',
+    label:'Knapp, Wiggins y Nuccetelli ante el Task Force',
+    body:'"Restoring Public Trust Through UAP Transparency and Whistleblower Protection". George Knapp (KLAS-TV, 38 años investigando el fenómeno) señala que Lockheed Martin custodia material UAP sacado del gobierno hacia contratistas privados para evadir el FOIA. El Rep. Burlison muestra por primera vez un video de un MQ-9 sobre Yemen (oct. 2024): un misil Hellfire impacta el objeto sin derribarlo. Los militares Wiggins y Nuccetelli describen encuentros en activo y denuncian represalias contra denunciantes.',
+    actors:['George Knapp','Jeffrey Nuccetelli','Alexandro Wiggins','Dylan Borland','Rep. Anna Paulina Luna','Rep. Tim Burchett','Rep. Eric Burlison'] },
+];
+
+const IS_CONGRESS = g => g === '4h' || g === '4l';
+
+function buildTimeline(filterGroup) {
+  const container = document.getElementById('timeline');
+  container.innerHTML = '';
+  let currentYear = null;
+
+  EVENTS.forEach((ev, i) => {
+    const g = ev.group;
+    const isCongress = IS_CONGRESS(g);
+
+    // filter logic
+    let hidden = false;
+    if (filterGroup !== 'all') {
+      if (filterGroup === '4h' || filterGroup === '4l') {
+        hidden = g !== filterGroup;
+      } else {
+        hidden = g !== filterGroup;
+      }
+    }
+
+    // ── Year marker ──
+    if (ev.year !== currentYear) {
+      currentYear = ev.year;
+      const ym = document.createElement('div');
+      ym.className = 'tl-row year-marker';
+      ym.innerHTML = `
+        <div class="ev-left" style="text-align:right">
+          <span class="year-label">${ev.year}</span>
+        </div>
+        <div class="ev-center"><div class="year-dot"></div></div>
+        <div class="ev-right" style="display:flex;align-items:center">
+          <div class="year-line"></div>
+        </div>`;
+      container.appendChild(ym);
+    }
+
+    // ── Event row ──
+    const row = document.createElement('div');
+    row.className = 'tl-row event' + (hidden ? ' hidden' : '');
+    row.dataset.group = g;
+
+    const dateStr = ev.day
+      ? `<div class="ev-day">${ev.day}</div><div class="ev-month">${ev.month}</div>`
+      : `<div class="ev-month">${ev.month || ''}</div>`;
+
+    const dotClass = `event-dot dot-${g}${g === '4l' ? ' dot-law' : ''}`;
+    const cardBase = isCongress
+      ? `event-card card-congress border-r-${g}${g === '4l' ? ' card-law' : ''}`
+      : `event-card border-${g}`;
+
+    const actorsHTML = ev.actors.map(a => `<span class="actor-tag">${a}</span>`).join('');
+    const titleIcon = isCongress
+      ? `<span class="toggle-icon">▾</span> ${ev.label}`
+      : `${ev.label} <span class="toggle-icon">▾</span>`;
+
+    const cardHTML = `
+      <div class="${cardBase}">
+        <div class="card-cat cat-${g}">${CAT[g]}</div>
+        <div class="card-title">${titleIcon}</div>
+        <div class="card-detail">
+          <div class="card-body">${ev.body}</div>
+          <div class="card-actors">${actorsHTML}</div>
+        </div>
+      </div>`;
+
+    if (isCongress) {
+      row.innerHTML = `
+        <div class="ev-left">${cardHTML}</div>
+        <div class="ev-center"><div class="${dotClass}"></div></div>
+        <div class="ev-right"><div class="date-right">${dateStr}</div></div>`;
+    } else {
+      row.innerHTML = `
+        <div class="ev-left" style="text-align:right"><div class="date-left">${dateStr}</div></div>
+        <div class="ev-center"><div class="${dotClass}"></div></div>
+        <div class="ev-right">${cardHTML}</div>`;
+    }
+
+    container.appendChild(row);
+
+    // Toggle
+    const card   = row.querySelector('.event-card');
+    const detail = row.querySelector('.card-detail');
+    card.addEventListener('click', () => {
+      const isOpen = detail.classList.contains('open');
+      document.querySelectorAll('.card-detail.open').forEach(d => {
+        d.classList.remove('open');
+        d.closest('.event-card').classList.remove('open');
+      });
+      if (!isOpen) { detail.classList.add('open'); card.classList.add('open'); }
+    });
+  });
+
+  // Ocultar year-markers sin eventos visibles
+  if (filterGroup !== 'all') {
+    document.querySelectorAll('.year-marker').forEach(ym => {
+      let sib = ym.nextElementSibling;
+      let visible = false;
+      while (sib && !sib.classList.contains('year-marker')) {
+        if (!sib.classList.contains('hidden')) visible = true;
+        sib = sib.nextElementSibling;
+      }
+      ym.style.display = visible ? '' : 'none';
+    });
+  }
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    buildTimeline(this.dataset.group);
+  });
+});
+
+buildTimeline('all');
+</script>
+</body>
+</html>
